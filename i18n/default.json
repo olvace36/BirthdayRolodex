@@ -1,0 +1,16 @@
+{
+    "gmcm.CycleTime.name": "Cycle Time",
+    "gmcm.CycleTime.tooltip": "How long, in milliseconds, to wait between each movement when automatically rotating the queue. Minimum 500.",
+    "gmcm.PauseTime.name": "Pause Time",
+    "gmcm.PauseTime.tooltip": "How long, in milliseconds, to wait after manually rotating the queue before resuming automatic rotation. Minimum 1000.",
+    "gmcm.StaggerDistance.name": "Stagger Distance",
+    "gmcm.StaggerDistance.tooltip": "How far, in screen pixels, each additional icon is offset from the main draw position.",
+    "gmcm.QueueBrightness.name": "Queue Brightness",
+    "gmcm.QueueBrightness.tooltip": "How brightly each additional icon is drawn.",
+    "gmcm.CycleSoundVolume.name": "Cycle Sound Volume",
+    "gmcm.CycleSoundVolume.tooltip": "How loudly to play the page sound effect when the queue is manually rotated. Set to 0 to disable the sound.",
+    "gmcm.AlwaysCycle.name": "Always Cycle",
+    "gmcm.AlwaysCycle.tooltip": "Whether to automatically rotate the queue even when not hovering over the date.",
+    "gmcm.InvertScrollDirection.name": "Invert Scroll Direction",
+    "gmcm.InvertScrollDirection.tooltip": "Whether to flip the default mapping of scroll wheel directions to texture cycle directions."
+}

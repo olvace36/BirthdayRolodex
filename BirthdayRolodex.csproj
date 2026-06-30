@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <Version>0.1.1-beta</Version>
+        <TargetFramework>net6.0</TargetFramework>
+    </PropertyGroup>
+
+    <PropertyGroup Label="SMAPI" >
+        <ModFolderName>$(MOD_FOLDER_NAME)</ModFolderName>
+        <EnableHarmony>true</EnableHarmony>
+    </PropertyGroup>
+
+    <PropertyGroup Label="TowerCore" >
+    </PropertyGroup>
+
+    <Import Project="..\TowerCore\TowerCore.msbuild" />
+
+    <ItemGroup>
+        <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.4.0" />
+    </ItemGroup>
+</Project>

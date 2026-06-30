@@ -1,0 +1,11 @@
+{
+  "Name": "Birthday Rolodex",
+  "Author": "ichortower",
+  "Description": "Cycles birthday sprites on the town calendar.",
+  "Version": "%ProjectVersion%",
+  "UniqueID": "ichortower.BirthdayRolodex",
+  "EntryDll": "BirthdayRolodex.dll",
+  "MinimumApiVersion": "4.1.0",
+  "UpdateKeys": ["Nexus:48314", "GitHub:ichortower/BirthdayRolodex"],
+  "Dependencies": []
+}
