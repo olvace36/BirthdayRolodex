@@ -9,6 +9,10 @@ When you mouseover each date, the lineup of NPC images will start automatically
 rotating. You can also left-click or scroll your mouse wheel to rotate them
 manually, which will pause the automatic rotation for a time.
 
+![An animated preview of how this mod looks in action. The cursor hovers over
+the calendar days, packed with multiple NPC icons, and they periodically
+rotate to focus the next one in line](sample-crop.gif)
+
 This mod has no other effects and won't meaningfully change your gameplay, but
 I think it makes looking at the calendar a bit nicer.
 
@@ -51,4 +55,5 @@ on the calendar. No other day events do this, to my knowledge.
 ## Special Thanks
 
 [mushymato](https://github.com/mushymato), for the snipe (and the name)
+
 [scarlett](https://www.nexusmods.com/profile/scarlett28), for beta/stress testing
