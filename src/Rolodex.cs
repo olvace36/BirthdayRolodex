@@ -216,6 +216,11 @@ public class Rolodex
             return;
         }
         foreach (ClickableTextureComponent c in __instance.calendarDays) {
+            // for Happy Birthday, which adds the player's birthday to the
+            // calendar in a somewhat broken way
+            if (c.myID < 1 || c.myID > StardewValley.WorldDate.DaysPerMonth) {
+                continue;
+            }
             if (ModMain.Config.AlwaysCycle || c.bounds.Contains(x, y)) {
                 Data[c.myID - 1]?.Hover();
             }
