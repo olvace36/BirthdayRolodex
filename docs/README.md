@@ -43,13 +43,18 @@ recommended.
 
 ## Compatibility
 
-No known conflicts at this time. This mod doesn't ship any of its own assets,
-so it should seamlessly work with any interface mods, character sprite edits,
-etc.
+This mod doesn't ship any of its own assets, so it should seamlessly work with
+any interface mods, character sprite edits, etc.
 
 This mod isn't specifically written for birthdays, and should work with any day
 event that defines its own texture, which is how birthdays are set up to behave
 on the calendar. No other day events do this, to my knowledge.
+
+If you use the Happy Birthday mod by Omegasis, that mod draws the farmer's and
+farmhands' birthdays on the calendar on its own, rather than putting them in
+the menu's calendar data along with the NPC birthdays. As a result, they will
+not join the NPCs in the rolodex effect and their sprites will be drawn over
+top. I don't have a solution for this.
 
 
 ## Special Thanks
