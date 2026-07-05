@@ -7,5 +7,7 @@
   "EntryDll": "BirthdayRolodex.dll",
   "MinimumApiVersion": "4.1.0",
   "UpdateKeys": ["Nexus:48314", "GitHub:ichortower/BirthdayRolodex"],
-  "Dependencies": []
+  "Dependencies": [
+    { "UniqueID": "olvace36.LookupAnythingMobileSearch", "IsRequired": false }
+  ]
 }
