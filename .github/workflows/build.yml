@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # Main mod repo (your fork) - unmodified from upstream
+      # Main mod repo (your fork)
       - name: Checkout BirthdayRolodex
         uses: actions/checkout@v4
         with:
@@ -24,23 +24,22 @@ jobs:
           ref: prod
           path: TowerCore
 
-      # Reuse the Android game assemblies already committed in sns-android-fix
-      # (StardewValley.dll, StardewModdingAPI.dll, MonoGame.Framework.dll,
-      # 0Harmony.dll, xTile.dll live at its repo root) instead of duplicating
-      # them here. ModBuildConfig will use this folder via GamePath below.
-      - name: Checkout Android game assemblies
+      # Reuse the same libs/ folder (StardewValley.dll, MonoGame.Framework.dll,
+      # StardewModdingAPI.dll, 0Harmony.dll, xTile.dll) you already maintain
+      # for lookup-anything-mobile-search / sns-android-fix, instead of
+      # duplicating it by hand in this repo.
+      - name: Checkout libs/
         uses: actions/checkout@v4
         with:
-          repository: olvace36/sns-android-fix
+          repository: olvace36/lookup-anything-mobile-search
           ref: main
-          path: game-assemblies
+          path: libs-source
           sparse-checkout: |
-            StardewValley.dll
-            StardewModdingAPI.dll
-            MonoGame.Framework.dll
-            0Harmony.dll
-            xTile.dll
+            libs
           sparse-checkout-cone-mode: false
+
+      - name: Place libs/ next to the csproj
+        run: cp -r libs-source/libs BirthdayRolodex/libs
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -49,15 +48,10 @@ jobs:
 
       - name: Build
         working-directory: BirthdayRolodex
-        # ModBuildConfig normally auto-detects the game install; in CI there
-        # isn't one, so we point it at the Android assemblies checked out above.
-        run: >
-          dotnet build -c Release
-          -p:GamePath="${{ github.workspace }}/game-assemblies"
+        run: dotnet build -c Release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: BirthdayRolodex
           path: BirthdayRolodex/bin/Release/net6.0/*
-          
