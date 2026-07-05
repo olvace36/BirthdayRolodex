@@ -12,3 +12,16 @@ namespace GenericModConfigMenu
     }
 }
 
+namespace BirthdayRolodex
+{
+    // Soft dependency: LookupAnythingMobileSearch implements a matching
+    // ShowNpcByName(string) method on its own ModEntry (which also
+    // implements this same interface shape). SMAPI's GetApi<T> builds a
+    // proxy by matching method signatures, so the two mods never need to
+    // reference each other's assemblies.
+    public interface ILookupAnythingMobileSearchApi
+    {
+        bool ShowNpcByName(string npcInternalName);
+    }
+}
+
