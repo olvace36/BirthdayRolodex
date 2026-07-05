@@ -143,17 +143,36 @@ public class Rolodex
         int count = day.Events.Count;
         int start = 0;//(day.SlideOffset != 0 ? 1 : 0);
         Color drawColor = LerpColor(0f);
+
+        // NOTE: previously this used hardcoded pixel constants (scale 4f,
+        // y-offset 28, base stagger 48) tuned to PC's calendar cell size and
+        // portrait source-rect dimensions. On Android, Billboard's cell
+        // bounds and/or the portrait source rect can differ in size, so
+        // those fixed constants no longer match the cell and the icon draws
+        // oversized/misplaced, overflowing into neighboring rows.
+        //
+        // Fix: derive scale and position from the actual cell bounds
+        // (dayCtc.bounds) and the actual source rect of the texture being
+        // drawn, so the icon always fits inside the cell regardless of
+        // platform-specific sizing. Tweak MarginFactor below if you want
+        // the icon a bit smaller/larger relative to the cell.
+        const float MarginFactor = 0.85f; // icon height as a fraction of cell height
+        Billboard.BillboardEvent firstEvt = day.Events[0];
+        float scale = (dayCtc.bounds.Height * MarginFactor) / firstEvt.TextureSourceRect.Height;
+
         for (int i = start; i < count; ++i) {
             int g = (count - 1 - i + day.CycleIndex) % count;
             Billboard.BillboardEvent evt = day.Events[g];
             if (i == count - 1) {
                 drawColor = LerpColor(1f - (float)Math.Abs(day.SlideOffset) / (float)ModMain.Config.StaggerDistance);
             }
-            int stagger = Math.Max(0, 48 + day.SlideOffset - ModMain.Config.StaggerDistance * (count - 1 - i));
+            int iconHeight = (int)(evt.TextureSourceRect.Height * scale);
+            int baseStagger = (int)(evt.TextureSourceRect.Width * scale);
+            int stagger = Math.Max(0, baseStagger + day.SlideOffset - ModMain.Config.StaggerDistance * (count - 1 - i));
             int x = dayCtc.bounds.X + stagger;
-            int y = dayCtc.bounds.Y + 28;
+            int y = dayCtc.bounds.Y + dayCtc.bounds.Height - iconHeight;
             sb.Draw(evt.Texture, new Vector2(x, y), evt.TextureSourceRect, drawColor, 0f,
-                    Vector2.Zero, 4f, SpriteEffects.None, 1f);
+                    Vector2.Zero, scale, SpriteEffects.None, 1f);
         }
         if (day.SlideOffset != 0) {
             day.SlideOffset -= Math.Sign(day.SlideOffset);
@@ -269,3 +288,4 @@ public class Rolodex
         }
     }
 }
+
