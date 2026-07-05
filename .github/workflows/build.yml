@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # Main mod repo (your fork)
+      # Main mod repo (your fork) - unmodified from upstream
       - name: Checkout BirthdayRolodex
         uses: actions/checkout@v4
         with:
@@ -24,6 +24,24 @@ jobs:
           ref: prod
           path: TowerCore
 
+      # Reuse the Android game assemblies already committed in sns-android-fix
+      # (StardewValley.dll, StardewModdingAPI.dll, MonoGame.Framework.dll,
+      # 0Harmony.dll, xTile.dll live at its repo root) instead of duplicating
+      # them here. ModBuildConfig will use this folder via GamePath below.
+      - name: Checkout Android game assemblies
+        uses: actions/checkout@v4
+        with:
+          repository: olvace36/sns-android-fix
+          ref: main
+          path: game-assemblies
+          sparse-checkout: |
+            StardewValley.dll
+            StardewModdingAPI.dll
+            MonoGame.Framework.dll
+            0Harmony.dll
+            xTile.dll
+          sparse-checkout-cone-mode: false
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -31,11 +49,15 @@ jobs:
 
       - name: Build
         working-directory: BirthdayRolodex
-        run: dotnet build -c Release
+        # ModBuildConfig normally auto-detects the game install; in CI there
+        # isn't one, so we point it at the Android assemblies checked out above.
+        run: >
+          dotnet build -c Release
+          -p:GamePath="${{ github.workspace }}/game-assemblies"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: BirthdayRolodex
           path: BirthdayRolodex/bin/Release/net6.0/*
-
+          
