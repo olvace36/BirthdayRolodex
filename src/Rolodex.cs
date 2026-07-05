@@ -120,10 +120,80 @@ public class Rolodex
                     null, new Type[] { typeof(string), typeof(float) }, null);
             setVariable?.Invoke(cue, new object[] { "Volume", multiplier });
         }
+
+        /*
+         * Long-press support (for LookupAnythingMobileSearch integration):
+         * a quick tap still cycles through NPCs as before. Holding the
+         * touch on the same cell past LongPressThresholdMs instead opens
+         * the Lookup Anything viewer for whichever NPC is currently on top
+         * of the stack (CycleIndex), without also cycling on release.
+         */
+        public static int LongPressThresholdMs = 500;
+        private long? _pressStartTicks = null;
+        private bool _longPressFired = false;
+
+        public void TrackPress(bool isOver)
+        {
+            if (!isOver) {
+                _pressStartTicks = null;
+                _longPressFired = false;
+                return;
+            }
+            if (_pressStartTicks is null) {
+                _pressStartTicks = Environment.TickCount64;
+                _longPressFired = false;
+                return;
+            }
+            if (!_longPressFired &&
+                    Environment.TickCount64 - _pressStartTicks.Value >= LongPressThresholdMs) {
+                _longPressFired = true;
+                TriggerLookup();
+            }
+        }
+
+        // Called from the click handler to check (and clear) whether a
+        // long-press already fired for this cell, so the release doesn't
+        // also trigger a cycle.
+        public bool ConsumeLongPress()
+        {
+            bool fired = _longPressFired;
+            _longPressFired = false;
+            _pressStartTicks = null;
+            return fired;
+        }
+
+        private void TriggerLookup()
+        {
+            if (Events.Count == 0 || Rolodex.LookupApi is null) {
+                return;
+            }
+            Billboard.BillboardEvent evt = Events[CycleIndex];
+            if (evt.Type != Billboard.BillboardEventType.Birthday
+                    || evt.Arguments is null || evt.Arguments.Length == 0) {
+                return;
+            }
+            string npcName = evt.Arguments[0];
+            Rolodex.LookupApi.ShowNpcByName(npcName);
+        }
     }
 
     internal static Color UnfocusedColor = LerpColor(0f);
     internal static Color FocusedColor = Color.White;
+
+    // Soft dependency on LookupAnythingMobileSearch, fetched via SMAPI's
+    // GetApi<T> so this mod compiles/runs fine even if that mod isn't
+    // installed (LookupApi just stays null and long-press does nothing).
+    internal static ILookupAnythingMobileSearchApi LookupApi = null;
+
+    [SmapiEvent]
+    internal static void GameLaunched(object sender, GameLaunchedEventArgs e)
+    {
+        LookupApi = Main.Helper.ModRegistry.GetApi<ILookupAnythingMobileSearchApi>(
+                "olvace36.LookupAnythingMobileSearch");
+        if (LookupApi is not null) {
+            Log.DebugWarn("LookupAnythingMobileSearch found; long-press lookup enabled.");
+        }
+    }
 
     internal static Color LerpColor(float t)
     {
@@ -276,12 +346,16 @@ public class Rolodex
             if (c.myID < 1 || c.myID > StardewValley.WorldDate.DaysPerMonth) {
                 continue;
             }
-            if (ModMain.Config.AlwaysCycle || c.bounds.Contains(x, y)) {
+            bool isOver = c.bounds.Contains(x, y);
+            if (ModMain.Config.AlwaysCycle || isOver) {
                 Data[c.myID - 1]?.Hover();
             }
             else {
                 Data[c.myID - 1]?.ResetTimer();
             }
+            // Long-press tracking is independent of AlwaysCycle - it only
+            // makes sense while the touch is actually over this cell.
+            Data[c.myID - 1]?.TrackPress(isOver);
         }
     }
 
@@ -297,7 +371,12 @@ public class Rolodex
         }
         foreach (ClickableTextureComponent c in __instance.calendarDays) {
             if (c.bounds.Contains(x, y)) {
-                Data[c.myID - 1]?.Click();
+                Day day = Data[c.myID - 1];
+                // If a long-press already opened the lookup viewer for this
+                // cell, don't also cycle to the next NPC on release.
+                if (day is not null && !day.ConsumeLongPress()) {
+                    day.Click();
+                }
                 break;
             }
         }
@@ -324,3 +403,4 @@ public class Rolodex
         }
     }
 }
+
