@@ -36,5 +36,9 @@
             <HintPath>libs\xTile.dll</HintPath>
             <Private>false</Private>
         </Reference>
+        <Reference Include="SMAPI.Toolkit.CoreInterfaces">
+            <HintPath>libs\SMAPI.Toolkit.CoreInterfaces.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
     </ItemGroup>
 </Project>
