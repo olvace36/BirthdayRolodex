@@ -182,9 +182,14 @@ public class Rolodex
         // drawn, so the icon always fits inside the cell regardless of
         // platform-specific sizing. Tweak MarginFactor below if you want
         // the icon a bit smaller/larger relative to the cell.
-        const float MarginFactor = 0.85f; // icon height as a fraction of cell height
+        const float MarginFactor = 0.85f; // icon size as a fraction of the cell
         Billboard.BillboardEvent firstEvt = day.Events[0];
-        float scale = (dayCtc.bounds.Height * MarginFactor) / firstEvt.TextureSourceRect.Height;
+        float scaleByHeight = (dayCtc.bounds.Height * MarginFactor) / firstEvt.TextureSourceRect.Height;
+        float scaleByWidth = (dayCtc.bounds.Width * MarginFactor) / firstEvt.TextureSourceRect.Width;
+        // Use whichever is smaller so the icon can never exceed the cell in
+        // either dimension (previously height-only, which overflowed
+        // sideways on non-square cells).
+        float scale = Math.Min(scaleByHeight, scaleByWidth);
 
         for (int i = start; i < count; ++i) {
             int g = (count - 1 - i + day.CycleIndex) % count;
@@ -192,9 +197,14 @@ public class Rolodex
             if (i == count - 1) {
                 drawColor = LerpColor(1f - (float)Math.Abs(day.SlideOffset) / (float)ModMain.Config.StaggerDistance);
             }
+            int iconWidth = (int)(evt.TextureSourceRect.Width * scale);
             int iconHeight = (int)(evt.TextureSourceRect.Height * scale);
-            int baseStagger = (int)(evt.TextureSourceRect.Width * scale);
-            int stagger = Math.Max(0, baseStagger + day.SlideOffset - ModMain.Config.StaggerDistance * (count - 1 - i));
+            // Right-align the front icon within the cell (base = rightmost
+            // possible position), so staggering only ever moves it left,
+            // never past either edge of the cell.
+            int baseStagger = Math.Max(0, dayCtc.bounds.Width - iconWidth);
+            int stagger = Math.Max(0, Math.Min(baseStagger,
+                    baseStagger + day.SlideOffset - ModMain.Config.StaggerDistance * (count - 1 - i)));
             int x = dayCtc.bounds.X + stagger;
             int y = dayCtc.bounds.Y + dayCtc.bounds.Height - iconHeight;
             sb.Draw(evt.Texture, new Vector2(x, y), evt.TextureSourceRect, drawColor, 0f,
@@ -314,4 +324,3 @@ public class Rolodex
         }
     }
 }
-
