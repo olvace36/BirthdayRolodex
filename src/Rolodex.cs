@@ -124,42 +124,42 @@ public class Rolodex
         /*
          * Long-press support (for LookupAnythingMobileSearch integration):
          * a quick tap still cycles through NPCs as before. Holding the
-         * touch on the same cell past LongPressThresholdMs instead opens
-         * the Lookup Anything viewer for whichever NPC is currently on top
-         * of the stack (CycleIndex), without also cycling on release.
+         * touch down on the same cell past LongPressThresholdMs instead
+         * opens the Lookup Anything viewer for whichever NPC is currently
+         * on top of the stack (CycleIndex), without also cycling.
+         *
+         * This is driven by real touch-down/touch-up events
+         * (receiveLeftClick / releaseLeftClick), NOT by polling
+         * performHoverAction's x,y every frame - on Android, the hover
+         * position reported after a touch is released doesn't clear or
+         * move away, it just stays wherever the finger last was. Polling
+         * position alone made the timer keep accumulating well after the
+         * finger had already lifted, firing a "long press" from an
+         * ordinary quick tap.
          */
         public static int LongPressThresholdMs = 500;
         private long? _pressStartTicks = null;
-        private bool _longPressFired = false;
 
-        public void TrackPress(bool isOver)
+        public void BeginPress()
         {
-            if (!isOver) {
-                _pressStartTicks = null;
-                _longPressFired = false;
-                return;
-            }
-            if (_pressStartTicks is null) {
-                _pressStartTicks = Environment.TickCount64;
-                _longPressFired = false;
-                return;
-            }
-            if (!_longPressFired &&
-                    Environment.TickCount64 - _pressStartTicks.Value >= LongPressThresholdMs) {
-                _longPressFired = true;
-                TriggerLookup();
-            }
+            _pressStartTicks = Environment.TickCount64;
         }
 
-        // Called from the click handler to check (and clear) whether a
-        // long-press already fired for this cell, so the release doesn't
-        // also trigger a cycle.
-        public bool ConsumeLongPress()
+        // Called on touch-up for this cell. Returns true if this was a
+        // long press (already opened the lookup viewer, so the caller
+        // should NOT also cycle to the next NPC).
+        public bool EndPress()
         {
-            bool fired = _longPressFired;
-            _longPressFired = false;
+            if (_pressStartTicks is null) {
+                return false;
+            }
+            long elapsed = Environment.TickCount64 - _pressStartTicks.Value;
             _pressStartTicks = null;
-            return fired;
+            if (elapsed >= LongPressThresholdMs) {
+                TriggerLookup();
+                return true;
+            }
+            return false;
         }
 
         private void TriggerLookup()
@@ -173,11 +173,8 @@ public class Rolodex
                 return;
             }
             // Don't call into LookupAnything here directly: we're still
-            // deep in Billboard's own performHoverAction call stack, which
-            // is what caused the native crash. Queue it and fire on the
-            // next tick instead (see Rolodex.UpdateTicked) - by then we're
-            // safely outside that call stack, and Lookup Anything can open
-            // on top of the still-active calendar menu as normal.
+            // deep in Billboard's own call stack. Queue it and fire on the
+            // next tick instead (see Rolodex.UpdateTicked).
             Rolodex.PendingLookupNpcName = evt.Arguments[0];
         }
     }
@@ -213,7 +210,16 @@ public class Rolodex
         }
         string npcName = PendingLookupNpcName;
         PendingLookupNpcName = null;
-        LookupApi.ShowNpcByName(npcName);
+        if (LookupApi.ShowNpcByName(npcName)) {
+            // The touch position that was over a calendar icon a moment ago
+            // is still "the cursor" as far as any other mod checking cursor
+            // position is concerned (Android has no real mouse to move away
+            // on its own). Nudge it off calendar entirely so mods like
+            // GiftTasteHelper, which check cursor position against
+            // calendarDays bounds, don't draw a stale tooltip over the
+            // Lookup Anything viewer that just opened.
+            Game1.setMousePosition(-1000, -1000, false);
+        }
     }
 
     internal static Color LerpColor(float t)
@@ -315,6 +321,17 @@ public class Rolodex
     public static void MenuChanged(object sender, MenuChangedEventArgs e)
     {
         if (e.OldMenu is Billboard && e.NewMenu is not Billboard) {
+            // Lookup Anything opens its viewer by pushing Billboard onto its
+            // own internal menu stack and swapping Game1.activeClickableMenu
+            // directly (bypassing the normal exit flow), then restores
+            // Billboard when the viewer closes. SMAPI's MenuChanged event
+            // still fires for that swap, but Billboard isn't actually
+            // closing - wiping our cache here would lose CycleIndex and
+            // leave the calendar blank/reset once Billboard comes back.
+            if (e.NewMenu is not null && (e.NewMenu.GetType().Namespace ?? "")
+                    .StartsWith("Pathoschild.Stardew.LookupAnything")) {
+                return;
+            }
             CleanUp();
         }
     }
@@ -367,22 +384,19 @@ public class Rolodex
             if (c.myID < 1 || c.myID > StardewValley.WorldDate.DaysPerMonth) {
                 continue;
             }
-            bool isOver = c.bounds.Contains(x, y);
-            if (ModMain.Config.AlwaysCycle || isOver) {
+            if (ModMain.Config.AlwaysCycle || c.bounds.Contains(x, y)) {
                 Data[c.myID - 1]?.Hover();
             }
             else {
                 Data[c.myID - 1]?.ResetTimer();
             }
-            // Long-press tracking is independent of AlwaysCycle - it only
-            // makes sense while the touch is actually over this cell.
-            Data[c.myID - 1]?.TrackPress(isOver);
         }
     }
 
-
-    // this one is fine, since there isn't an existing contains loop that this
-    // duplicates. we have to do the work regardless
+    // Marks the moment a touch/click goes down on a cell. The actual
+    // decision (tap = cycle, long-press = lookup) happens on release, in
+    // ReleaseLeftClick_Postfix below - see the Day class's press-tracking
+    // notes for why this can't be driven from performHoverAction on Android.
     [TargetMethod(typeof(Billboard), nameof(Billboard.receiveLeftClick))]
     [PatchType(PatchTypes.Postfix)]
     public static void Billboard_receiveLeftClick_Postfix(Billboard __instance, int x, int y)
@@ -392,10 +406,26 @@ public class Rolodex
         }
         foreach (ClickableTextureComponent c in __instance.calendarDays) {
             if (c.bounds.Contains(x, y)) {
+                Data[c.myID - 1]?.BeginPress();
+                break;
+            }
+        }
+    }
+
+    // Touch-up counterpart to receiveLeftClick above. A quick tap cycles
+    // the NPC as before; a hold past the threshold instead opens the
+    // lookup viewer (handled inside EndPress) and skips the cycle.
+    [TargetMethod(typeof(IClickableMenu), nameof(IClickableMenu.releaseLeftClick))]
+    [PatchType(PatchTypes.Postfix)]
+    public static void IClickableMenu_releaseLeftClick_Postfix(IClickableMenu __instance, int x, int y)
+    {
+        if (__instance is not Billboard menu || menu.calendarDays is null) {
+            return;
+        }
+        foreach (ClickableTextureComponent c in menu.calendarDays) {
+            if (c.bounds.Contains(x, y)) {
                 Day day = Data[c.myID - 1];
-                // If a long-press already opened the lookup viewer for this
-                // cell, don't also cycle to the next NPC on release.
-                if (day is not null && !day.ConsumeLongPress()) {
+                if (day is not null && !day.EndPress()) {
                     day.Click();
                 }
                 break;
