@@ -137,7 +137,7 @@ public class Rolodex
          * finger had already lifted, firing a "long press" from an
          * ordinary quick tap.
          */
-        public static int LongPressThresholdMs = 500;
+        public static int LongPressThresholdMs = 400;
         private long? _pressStartTicks = null;
 
         public void BeginPress()
@@ -172,10 +172,15 @@ public class Rolodex
                     || evt.Arguments is null || evt.Arguments.Length == 0) {
                 return;
             }
-            // Don't call into LookupAnything here directly: we're still
-            // deep in Billboard's own call stack. Queue it and fire on the
-            // next tick instead (see Rolodex.UpdateTicked).
+            // Close the calendar outright instead of letting Lookup
+            // Anything hide it underneath its own menu stack - that path
+            // was leaving stale/blank calendar state and letting other
+            // mods' calendar-tied tooltips bleed through. We reopen a
+            // fresh Billboard ourselves once Lookup Anything closes (see
+            // Rolodex.MenuChanged).
             Rolodex.PendingLookupNpcName = evt.Arguments[0];
+            Rolodex.ReopenCalendarAfterLookup = true;
+            Game1.activeClickableMenu?.exitThisMenu(false);
         }
     }
 
@@ -191,6 +196,10 @@ public class Rolodex
     // menu has actually finished closing. Never call the lookup API
     // synchronously from inside a Billboard patch - see TriggerLookup.
     internal static string PendingLookupNpcName = null;
+
+    // True from the moment we close the calendar for a long-press lookup
+    // until we've reopened a fresh one after Lookup Anything closes.
+    internal static bool ReopenCalendarAfterLookup = false;
 
     [SmapiEvent]
     internal static void GameLaunched(object sender, GameLaunchedEventArgs e)
@@ -208,18 +217,16 @@ public class Rolodex
         if (PendingLookupNpcName is null || LookupApi is null) {
             return;
         }
+        // Wait until the calendar has actually finished closing before
+        // opening Lookup Anything - otherwise Lookup Anything would still
+        // see Billboard as the active menu and hide it underneath its own
+        // menu stack instead of opening cleanly on its own.
+        if (Game1.activeClickableMenu is Billboard) {
+            return;
+        }
         string npcName = PendingLookupNpcName;
         PendingLookupNpcName = null;
-        if (LookupApi.ShowNpcByName(npcName)) {
-            // The touch position that was over a calendar icon a moment ago
-            // is still "the cursor" as far as any other mod checking cursor
-            // position is concerned (Android has no real mouse to move away
-            // on its own). Nudge it off calendar entirely so mods like
-            // GiftTasteHelper, which check cursor position against
-            // calendarDays bounds, don't draw a stale tooltip over the
-            // Lookup Anything viewer that just opened.
-            Game1.setMousePosition(-1000, -1000, false);
-        }
+        LookupApi.ShowNpcByName(npcName);
     }
 
     internal static Color LerpColor(float t)
@@ -321,18 +328,15 @@ public class Rolodex
     public static void MenuChanged(object sender, MenuChangedEventArgs e)
     {
         if (e.OldMenu is Billboard && e.NewMenu is not Billboard) {
-            // Lookup Anything opens its viewer by pushing Billboard onto its
-            // own internal menu stack and swapping Game1.activeClickableMenu
-            // directly (bypassing the normal exit flow), then restores
-            // Billboard when the viewer closes. SMAPI's MenuChanged event
-            // still fires for that swap, but Billboard isn't actually
-            // closing - wiping our cache here would lose CycleIndex and
-            // leave the calendar blank/reset once Billboard comes back.
-            if (e.NewMenu is not null && (e.NewMenu.GetType().Namespace ?? "")
-                    .StartsWith("Pathoschild.Stardew.LookupAnything")) {
-                return;
-            }
             CleanUp();
+        }
+        // We close the calendar ourselves before opening Lookup Anything
+        // (see Day.TriggerLookup), so once Lookup Anything's viewer fully
+        // closes back to nothing, reopen a fresh calendar automatically.
+        if (ReopenCalendarAfterLookup && e.NewMenu is null && e.OldMenu is not null
+                && (e.OldMenu.GetType().Namespace ?? "").StartsWith("Pathoschild.Stardew.LookupAnything")) {
+            ReopenCalendarAfterLookup = false;
+            Game1.activeClickableMenu = new Billboard(false);
         }
     }
 
@@ -454,4 +458,3 @@ public class Rolodex
         }
     }
 }
-
