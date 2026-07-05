@@ -172,8 +172,13 @@ public class Rolodex
                     || evt.Arguments is null || evt.Arguments.Length == 0) {
                 return;
             }
-            string npcName = evt.Arguments[0];
-            Rolodex.LookupApi.ShowNpcByName(npcName);
+            // Don't call into LookupAnything here directly: we're still
+            // deep in Billboard's own performHoverAction call stack, which
+            // is what caused the native crash. Queue it and fire on the
+            // next tick instead (see Rolodex.UpdateTicked) - by then we're
+            // safely outside that call stack, and Lookup Anything can open
+            // on top of the still-active calendar menu as normal.
+            Rolodex.PendingLookupNpcName = evt.Arguments[0];
         }
     }
 
@@ -185,6 +190,11 @@ public class Rolodex
     // installed (LookupApi just stays null and long-press does nothing).
     internal static ILookupAnythingMobileSearchApi LookupApi = null;
 
+    // Set by a long-press; consumed on the next tick once the calendar
+    // menu has actually finished closing. Never call the lookup API
+    // synchronously from inside a Billboard patch - see TriggerLookup.
+    internal static string PendingLookupNpcName = null;
+
     [SmapiEvent]
     internal static void GameLaunched(object sender, GameLaunchedEventArgs e)
     {
@@ -193,6 +203,17 @@ public class Rolodex
         if (LookupApi is not null) {
             Log.DebugWarn("LookupAnythingMobileSearch found; long-press lookup enabled.");
         }
+    }
+
+    [SmapiEvent]
+    internal static void UpdateTicked(object sender, UpdateTickedEventArgs e)
+    {
+        if (PendingLookupNpcName is null || LookupApi is null) {
+            return;
+        }
+        string npcName = PendingLookupNpcName;
+        PendingLookupNpcName = null;
+        LookupApi.ShowNpcByName(npcName);
     }
 
     internal static Color LerpColor(float t)
