@@ -69,7 +69,7 @@ public class Rolodex
             }
             if (ModMain.Config.CycleSoundVolume > 0.0f) {
                 _ = Game1.playSound("shwip", out ICue cue);
-                cue.Volume *= ModMain.Config.CycleSoundVolume;
+                ApplyCueVolume(cue, ModMain.Config.CycleSoundVolume);
             }
             Next();
             CycleTimer = ModMain.Config.PauseTime;
@@ -84,7 +84,7 @@ public class Rolodex
             }
             if (ModMain.Config.CycleSoundVolume > 0.0f) {
                 _ = Game1.playSound("shwip", out ICue cue);
-                cue.Volume *= ModMain.Config.CycleSoundVolume;
+                ApplyCueVolume(cue, ModMain.Config.CycleSoundVolume);
             }
             if (Math.Sign(direction) > 0) {
                 Previous();
@@ -93,6 +93,32 @@ public class Rolodex
                 Next();
             }
             CycleTimer = ModMain.Config.PauseTime;
+        }
+
+        // NOTE: the Android build's ICue doesn't expose a settable "Volume"
+        // property the way PC's does (compile error CS1061). Rather than
+        // hardcode against one platform's shape, use reflection to apply the
+        // volume however this platform's ICue supports it (a "Volume"
+        // property if present, otherwise a SetVariable(string, float)
+        // method commonly used by the underlying audio engine). If neither
+        // is found, this silently does nothing instead of failing to build.
+        private static void ApplyCueVolume(ICue cue, float multiplier)
+        {
+            if (cue is null) {
+                return;
+            }
+            Type t = cue.GetType();
+            PropertyInfo volumeProp = t.GetProperty("Volume",
+                    BindingFlags.Public | BindingFlags.Instance);
+            if (volumeProp is not null && volumeProp.CanRead && volumeProp.CanWrite) {
+                float current = (float)volumeProp.GetValue(cue);
+                volumeProp.SetValue(cue, current * multiplier);
+                return;
+            }
+            MethodInfo setVariable = t.GetMethod("SetVariable",
+                    BindingFlags.Public | BindingFlags.Instance,
+                    null, new Type[] { typeof(string), typeof(float) }, null);
+            setVariable?.Invoke(cue, new object[] { "Volume", multiplier });
         }
     }
 
